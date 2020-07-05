@@ -1,10 +1,10 @@
-#![feature(const_generics)]
 use sdl2;
 
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
 
+use rand::Rng;
 
 struct Triangle<T, C> {
     pt1: T,
@@ -36,28 +36,34 @@ struct Pt2 {
     y: usize,
 }
 
-fn make_triangle_partition<
-    const pixels_width: usize,
-    const pixels_height: usize,
-    const grid_width: usize,
-    const grid_height: usize,
-    const jitter: usize,
->() -> Result<[Triangle<Pt2, RGBA>; grid_height*grid_width*2 ], _> {
-    if grid_height * grid_width == 0 {
-        return Err
-    };
+fn make_triangle_partition(
+    pixels_width: usize,
+    pixels_height: usize,
+    grid_width: usize,
+    grid_height: usize,
+    jitter: usize,
+) -> Vec<Triangle<Pt2, RGBA>> {
     let float_pitch_x = pixels_width as f32 / grid_width as f32;
     let float_pitch_y = pixels_height as f32 / grid_height as f32;
-    let mut points = [Pt2; grid_height * grid_width];
+    let mut points = vec![Pt2 { x: 0, y: 0 }; grid_height * grid_width];
     for i in 1..grid_height {
         for j in 1..grid_width {
+            let (down, right): (bool, bool) = (rand::random(), rand::random());
             points[i + grid_height * j] = Pt2 {
-                x: i * float_pitch_x as usize,
-                y: j * float_pitch_y as usize,
+                x: match down {
+                    false => (i as f32 * float_pitch_x) as usize,
+                    true => (i as f32 * float_pitch_x) as usize + jitter,
+                },
+                y: match right {
+                    false => (j as f32 * float_pitch_y) as usize,
+                    true => (j as f32 * float_pitch_y) as usize + jitter,
+                },
             };
         }
     }
-    let mut triangles = [Triangle<Pt2, RGBA>; grid_height*grid_width*2];
+    let mut triangles: Vec<Triangle<Pt2, RGBA>>;
+
+    return triangles;
 }
 
 fn draw_triangle<P>(t: Triangle<Pt2, RGBA>, plotter: &mut P)
