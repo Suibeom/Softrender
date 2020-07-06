@@ -35,6 +35,11 @@ struct Pt2 {
     x: usize,
     y: usize,
 }
+fn get_color() -> RGBA {
+    let color = rand::thread_rng().gen::<u32>();
+    let color = color & 0xFFFFFF;
+    return RGBA { c: color };
+}
 
 fn make_triangle_partition(
     pixels_width: usize,
@@ -45,9 +50,9 @@ fn make_triangle_partition(
 ) -> Vec<Triangle<Pt2, RGBA>> {
     let float_pitch_x = pixels_width as f32 / grid_width as f32;
     let float_pitch_y = pixels_height as f32 / grid_height as f32;
-    let mut points = vec![Pt2 { x: 0, y: 0 }; grid_height * grid_width];
-    for i in 1..grid_height {
-        for j in 1..grid_width {
+    let mut points = vec![Pt2 { x: 0, y: 0 }; (grid_height + 1) * (grid_width + 1)];
+    for i in 0..grid_height {
+        for j in 0..grid_width {
             let (down, right): (bool, bool) = (rand::random(), rand::random());
             points[i + grid_height * j] = Pt2 {
                 x: match down {
@@ -61,7 +66,47 @@ fn make_triangle_partition(
             };
         }
     }
-    let mut triangles: Vec<Triangle<Pt2, RGBA>>;
+    let mut triangles: Vec<Triangle<Pt2, RGBA>> = Vec::new();
+    let ul_grid_height = (grid_height as i64 - 1) as usize;
+    let ul_grid_width = (grid_width as i64 - 1) as usize;
+
+    for i in 0..ul_grid_height {
+        for j in 0..ul_grid_width {
+            match rand::random() {
+                // true => slice from i,j to i+1, j+1
+                // false => slice from i, j+1 to i+1, j
+                true => {
+                    triangles.push(normal_form(Triangle {
+                        pt1: points[i + grid_height * j],
+                        pt2: points[i + 1 + grid_height * j],
+                        pt3: points[(i + 1) + grid_height * (j + 1)],
+                        color: get_color(),
+                    }));
+                    triangles.push(normal_form(Triangle {
+                        pt1: points[i + grid_height * j],
+                        pt2: points[i + grid_height * (j + 1)],
+                        pt3: points[i + 1 + grid_height * (j + 1)],
+                        color: get_color(),
+                    }));
+                }
+
+                false => {
+                    triangles.push(normal_form(Triangle {
+                        pt1: points[i + grid_height * j],
+                        pt2: points[i + 1 + grid_height * j],
+                        pt3: points[i + grid_height * (j + 1)],
+                        color: get_color(),
+                    }));
+                    triangles.push(normal_form(Triangle {
+                        pt1: points[(i + 1) + grid_height * j],
+                        pt2: points[i + grid_height * (j + 1)],
+                        pt3: points[i + 1 + grid_height * (j + 1)],
+                        color: get_color(),
+                    }));
+                }
+            }
+        }
+    }
 
     return triangles;
 }
@@ -99,9 +144,6 @@ where
             plotter(Pt2 { x, y }, t.color.clone());
         }
     }
-    plotter(t.pt1, RGBA { c: 0xFFFFFF });
-    plotter(t.pt2, RGBA { c: 0xFFFF00 });
-    plotter(t.pt3, RGBA { c: 0x00FFFF });
 }
 
 fn slope_intercept(from: Pt2, to: Pt2) -> (f32, f32) {
@@ -114,7 +156,15 @@ fn normal_form(t: Triangle<Pt2, RGBA>) -> Triangle<Pt2, RGBA> {
     let mut pts = [t.pt1, t.pt2, t.pt3];
     pts.sort_unstable_by(|a, b| (a.x + W * a.y).partial_cmp(&(b.x + W * b.y)).unwrap());
     let pt1 = pts[0];
-    let (pt2, pt3) = match pts[1].x <= pts[2].x {
+    let (v1_x, v1_y) = (
+        pts[0].x as i64 - pts[1].x as i64,
+        pts[0].y as i64 - pts[1].y as i64,
+    );
+    let (v2_x, v2_y) = (
+        pts[0].x as i64 - pts[2].x as i64,
+        pts[0].y as i64 - pts[2].y as i64,
+    );
+    let (pt2, pt3) = match v1_x * v2_y - v2_x * v1_y <= 0 {
         true => (pts[1], pts[2]),
         false => (pts[2], pts[1]),
     };
@@ -153,6 +203,18 @@ fn main() -> Result<(), String> {
     let mut plot = |pt: Pt2, color: RGBA| {
         let idx = 4 * pt.x + 4 * W * pt.y;
         let bytes = color.c.to_ne_bytes();
+        if pixels[idx] as u32
+            + pixels[idx + 1] as u32
+            + pixels[idx + 2] as u32
+            + pixels[idx + 3] as u32
+            != 0
+        {
+            pixels[idx] = 0xFF;
+            pixels[idx + 1] = 0xFF;
+            pixels[idx + 2] = 0xFF;
+            pixels[idx + 3] = 0xFF;
+            return;
+        }
         pixels[idx] = bytes[0];
         pixels[idx + 1] = bytes[1];
         pixels[idx + 2] = bytes[2];
@@ -173,8 +235,12 @@ fn main() -> Result<(), String> {
         color: RGBA::new(0xFFAAAA),
     };
     let t2 = normal_form(t2);
-    draw_triangle(t1, &mut plot);
-    draw_triangle(t2, &mut plot);
+    let tris = make_triangle_partition(320, 240, 10, 10, 10);
+    for tri in tris {
+        draw_triangle(tri, &mut plot);
+    }
+    //draw_triangle(t1, &mut plot);
+    //draw_triangle(t2, &mut plot);
     texture
         .update(None, &pixels, 4 * W)
         .map_err(|e| e.to_string())?;
