@@ -7,14 +7,22 @@ use sdl2::pixels::PixelFormatEnum;
 use rand::Rng;
 
 use std::ops;
-struct Triangle<T, C> {
+
+use std::time::SystemTime;
+
+#[derive(Copy, Clone)]
+struct Triangle<T, C>
+where
+    T: Copy + Clone,
+    C: Copy + Clone,
+{
     pt1: T,
     pt2: T,
     pt3: T,
     color: C,
 }
 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 struct RGBA {
     c: u32,
 }
@@ -38,9 +46,13 @@ struct Pt3 {
     z: f64,
 }
 
-struct ViewportData {
+struct ProjectionData {
+    origin_pt: Pt3,
+    plane_unit_normal: Pt3,
     plane_basis_x: Pt3,
     plane_basis_y: Pt3,
+}
+struct ViewportData {
     x_min: f64,
     x_max: f64,
     y_min: f64,
@@ -89,10 +101,16 @@ impl ops::Mul<f64> for Pt3 {
     }
 }
 #[derive(Copy, Clone)]
-struct Pt2 {
+struct RasterPoint {
     x: usize,
     y: usize,
     clipped: bool,
+}
+
+#[derive(Copy, Clone)]
+struct Pt2 {
+    x: f64,
+    y: f64,
 }
 
 fn get_color() -> RGBA {
@@ -215,36 +233,22 @@ fn make_triangle_partition(
     return triangles;
 }
 
-fn simple_projection<T>(p: Vertex<Pt3, T>) -> Vertex<Pt3, T> {
-    let origin_pt = Pt3 {
-        x: 0.0,
-        y: 0.0,
-        z: 0.0,
-    };
-    let plane_unit_normal = Pt3 {
-        x: 0.0,
-        y: 0.0,
-        z: 1.0,
-    };
-    let t = (1.0 - p.spatial * plane_unit_normal) / ((p.spatial - origin_pt) * plane_unit_normal);
-    let projected_point = origin_pt * t + p.spatial * (1.0 - t);
+fn simple_projection<T>(p: Vertex<Pt3, T>, proj: &ProjectionData) -> Vertex<Pt2, T> {
+    let t = (1.0 - p.spatial * proj.plane_unit_normal)
+        / ((p.spatial - proj.origin_pt) * proj.plane_unit_normal);
+    let projected_point = proj.origin_pt * t + p.spatial * (1.0 - t);
+    let plane_x = projected_point * proj.plane_basis_x;
+    let plane_y = projected_point * proj.plane_basis_y;
     return Vertex {
-        spatial: projected_point,
+        spatial: Pt2 {
+            x: plane_x,
+            y: plane_y,
+        },
         uv: p.uv,
     };
 }
-fn spatial_to_pixel<T>(p: Vertex<Pt3, T>) -> Vertex<Pt2, T> {
+fn spatial_to_pixel<T>(p: Vertex<Pt2, T>) -> Vertex<RasterPoint, T> {
     let v = ViewportData {
-        plane_basis_x: Pt3 {
-            x: 1.0,
-            y: 0.0,
-            z: 0.0,
-        },
-        plane_basis_y: Pt3 {
-            x: 0.0,
-            y: 1.0,
-            z: 0.0,
-        },
         x_min: -4.0,
         x_max: 4.0,
         y_min: -3.0,
@@ -252,11 +256,11 @@ fn spatial_to_pixel<T>(p: Vertex<Pt3, T>) -> Vertex<Pt2, T> {
         pixels_tall: H,
         pixels_wide: W,
     };
-    let plane_x = p.spatial * v.plane_basis_x;
-    let plane_y = p.spatial * v.plane_basis_y;
+    let plane_x = p.spatial.x;
+    let plane_y = p.spatial.y;
     if (plane_x < v.x_min) | (plane_x > v.x_max) | (plane_y < v.y_min) | (plane_y > v.y_max) {
         return Vertex {
-            spatial: Pt2 {
+            spatial: RasterPoint {
                 x: 0,
                 y: 0,
                 clipped: true,
@@ -267,7 +271,7 @@ fn spatial_to_pixel<T>(p: Vertex<Pt3, T>) -> Vertex<Pt2, T> {
     let x = (v.pixels_wide as f64 * (plane_x - v.x_min) / (v.x_max - v.x_min)) as usize;
     let y = (v.pixels_tall as f64 * (v.y_max - plane_y) / (v.y_max - v.y_min)) as usize;
     return Vertex {
-        spatial: Pt2 {
+        spatial: RasterPoint {
             x,
             y,
             clipped: false,
@@ -276,21 +280,26 @@ fn spatial_to_pixel<T>(p: Vertex<Pt3, T>) -> Vertex<Pt2, T> {
     };
 }
 
-fn prep_triangle<T>(t: Triangle<Vertex<Pt3, T>, RGBA>) -> Triangle<Vertex<Pt2, T>, RGBA>
+fn prep_triangle<T, P>(
+    t: Triangle<Vertex<Pt3, T>, RGBA>,
+    proj: &P,
+) -> Triangle<Vertex<RasterPoint, T>, RGBA>
 where
     T: Copy,
+    P: Fn(Vertex<Pt3, T>) -> Vertex<Pt2, T>,
 {
     return normal_form(Triangle {
-        pt1: spatial_to_pixel(simple_projection(t.pt1)),
-        pt2: spatial_to_pixel(simple_projection(t.pt2)),
-        pt3: spatial_to_pixel(simple_projection(t.pt3)),
+        pt1: spatial_to_pixel(proj(t.pt1)),
+        pt2: spatial_to_pixel(proj(t.pt2)),
+        pt3: spatial_to_pixel(proj(t.pt3)),
         color: t.color,
     });
 }
 
-fn draw_triangle<P, Q>(t: Triangle<Vertex<Pt2, Q>, RGBA>, plotter: &mut P)
+fn draw_triangle<P, Q>(t: Triangle<Vertex<RasterPoint, Q>, RGBA>, plotter: &mut P)
 where
     P: FnMut(usize, usize, RGBA) -> (),
+    Q: Copy + Clone,
 {
     let clipped = t.pt1.spatial.clipped | t.pt2.spatial.clipped | t.pt3.spatial.clipped;
     if clipped {
@@ -327,13 +336,15 @@ where
     }
 }
 
-fn slope_intercept(from: Pt2, to: Pt2) -> (f64, f64) {
+fn slope_intercept(from: RasterPoint, to: RasterPoint) -> (f64, f64) {
     let slope = (from.x as f64 - to.x as f64) / (from.y as f64 - to.y as f64);
     let intercept = from.x as f64 - (from.y as f64 * slope);
     return (slope, intercept);
 }
 
-fn normal_form<T>(t: Triangle<Vertex<Pt2, T>, RGBA>) -> Triangle<Vertex<Pt2, T>, RGBA>
+fn normal_form<T>(
+    t: Triangle<Vertex<RasterPoint, T>, RGBA>,
+) -> Triangle<Vertex<RasterPoint, T>, RGBA>
 where
     T: Copy,
 {
@@ -387,34 +398,8 @@ fn main() -> Result<(), String> {
         .create_texture_streaming(PixelFormatEnum::ARGB8888, 320, 240)
         .map_err(|e| e.to_string())?;
     // Create a red-green gradient
-    let mut pixels = [0u8; 4 * W * H];
-    let mut plot = |x: usize, y: usize, color: RGBA| {
-        let idx = 4 * x + 4 * W * y;
-        let bytes = color.c.to_ne_bytes();
-        if pixels[idx] as u32
-            + pixels[idx + 1] as u32
-            + pixels[idx + 2] as u32
-            + pixels[idx + 3] as u32
-            != 0
-        {
-            pixels[idx..idx + 4].clone_from_slice(&[0xFF, 0xFF, 0xFF, 0xFF]);
-            return;
-        }
-        pixels[idx..idx + 4].clone_from_slice(&bytes);
-    };
-
-    let tris = make_triangle_partition(-2.0, 2.0, -1.5, 2.5, 10, 10, 0.1);
-    for tri in tris {
-        draw_triangle(prep_triangle(tri), &mut plot);
-    }
-
-    texture
-        .update(None, &pixels, 4 * W)
-        .map_err(|e| e.to_string())?;
-
-    canvas.clear();
-    canvas.copy(&texture, None, None)?;
-    canvas.present();
+    let sys_time = SystemTime::now();
+    let tris = make_triangle_partition(-2.0, 2.0, -1.5, 2.5, 500, 500, 0.001);
 
     let mut event_pump = sdl_context.event_pump()?;
 
@@ -426,23 +411,57 @@ fn main() -> Result<(), String> {
                     keycode: Some(Keycode::Escape),
                     ..
                 } => break 'running,
-                _ => {
-                    let tris = make_triangle_partition(-2.0, 2.0, -1.5, 2.5, 10, 10, 0.1);
-                    for tri in tris {
-                        draw_triangle(prep_triangle(tri), &mut plot);
-                    }
-
-                    texture
-                        .update(None, &pixels, 4 * W)
-                        .map_err(|e| e.to_string())?;
-
-                    canvas.clear();
-                    canvas.copy(&texture, None, None)?;
-                    canvas.present();
-                }
+                _ => {}
             }
         }
         // The rest of the game loop goes here...
+        let elapsed = sys_time.elapsed().unwrap().as_secs_f64();
+        let (x, y) = elapsed.sin_cos();
+        let proj = ProjectionData {
+            origin_pt: Pt3 {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            plane_unit_normal: Pt3 {
+                x: 0.0,
+                y: 0.0,
+                z: 1.0,
+            },
+            plane_basis_x: Pt3 { x: x, y: y, z: 0.0 },
+            plane_basis_y: Pt3 {
+                x: -y,
+                y: x,
+                z: 0.0,
+            },
+        };
+        let mut pixels = [0u8; 4 * W * H];
+        let mut plot = |x: usize, y: usize, color: RGBA| {
+            let idx = 4 * x + 4 * W * y;
+            let bytes = color.c.to_ne_bytes();
+            if pixels[idx] as u32
+                + pixels[idx + 1] as u32
+                + pixels[idx + 2] as u32
+                + pixels[idx + 3] as u32
+                != 0
+            {
+                pixels[idx..idx + 4].clone_from_slice(&[0xFF, 0xFF, 0xFF, 0xFF]);
+                return;
+            }
+            pixels[idx..idx + 4].clone_from_slice(&bytes);
+        };
+        let simple_proj = |t| simple_projection(t, &proj);
+        for tri in &tris {
+            draw_triangle(prep_triangle(*tri, &simple_proj), &mut plot);
+        }
+
+        texture
+            .update(None, &pixels, 4 * W)
+            .map_err(|e| e.to_string())?;
+
+        canvas.clear();
+        canvas.copy(&texture, None, None)?;
+        canvas.present();
     }
 
     Ok(())
