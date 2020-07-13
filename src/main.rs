@@ -399,7 +399,7 @@ fn main() -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     // Create a red-green gradient
     let sys_time = SystemTime::now();
-    let tris = make_triangle_partition(-2.0, 2.0, -1.5, 2.5, 500, 500, 0.001);
+    let tris = make_triangle_partition(-2.0, 2.0, -1.5, 2.5, 400, 400, 0.01);
 
     let mut event_pump = sdl_context.event_pump()?;
 
