@@ -9,7 +9,6 @@ use rand::Rng;
 use std::ops;
 
 use std::time::SystemTime;
-
 #[derive(Copy, Clone)]
 struct Triangle<T, C>
 where
@@ -514,7 +513,7 @@ fn main() -> Result<(), String> {
             }
             pixels[idx..idx + 4].clone_from_slice(&bytes);
         };
-        let simple_proj = |t| simple_projection(t, &proj);
+        let simple_proj = |t| simple_projection_with_z(t, &proj);
         for tri in &tris {
             draw_triangle(prep_triangle(*tri, &simple_proj), &mut plot);
         }
