@@ -390,7 +390,7 @@ fn slope_intercept_perspective<T, U>(
     steps: u32,
 ) -> (f64, f64, T, T)
 where
-    T: ops::Add<T, Output = T> + ops::Mul<f64, Output = T> + ops::Sub<T, Output = T>,
+    T: ops::Add<T, Output = T> + ops::Mul<f64, Output = T> + ops::Sub<T, Output = T> + Copy,
     U: ZAugmented,
 {
     let z1_inv = from.spatial.get_z().recip();
@@ -398,11 +398,16 @@ where
     let steps_inv = (steps as f64).recip();
     let z_inv_slope = (z2_inv - z1_inv) * steps_inv;
     let z_inv_intercept = z1_inv;
-    let T1_zinv = from.uv * z1_inv;
-    let T2_zinv = to.uv * z2_inv;
-    let T_zinv_slope = (T2_zinv - T1_zinv) * steps_inv;
-    let T_zinv_intercept = T1_zinv;
-    return (z_inv_slope, z_inv_intercept, T_zinv_slope, T_zinv_intercept);
+    let uv1_zinv = from.uv * z1_inv;
+    let uv2_zinv = to.uv * z2_inv;
+    let uv_zinv_slope = (uv2_zinv - uv1_zinv) * steps_inv;
+    let uv_zinv_intercept = uv1_zinv;
+    return (
+        z_inv_slope,
+        z_inv_intercept,
+        uv_zinv_slope,
+        uv_zinv_intercept,
+    );
 }
 
 fn normal_form<T>(
@@ -513,7 +518,7 @@ fn main() -> Result<(), String> {
             }
             pixels[idx..idx + 4].clone_from_slice(&bytes);
         };
-        let simple_proj = |t| simple_projection_with_z(t, &proj);
+        let simple_proj = |t| simple_projection(t, &proj);
         for tri in &tris {
             draw_triangle(prep_triangle(*tri, &simple_proj), &mut plot);
         }
