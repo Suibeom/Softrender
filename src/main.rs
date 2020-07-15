@@ -100,6 +100,12 @@ impl ops::Mul<f64> for Pt3 {
         };
     }
 }
+
+impl ZAugmented for RasterPointDepth {
+    fn get_z(&self) -> f64 {
+        self.z
+    }
+}
 #[derive(Copy, Clone)]
 struct RasterPoint {
     x: usize,
@@ -108,9 +114,21 @@ struct RasterPoint {
 }
 
 #[derive(Copy, Clone)]
+struct RasterPointDepth {
+    x: usize,
+    y: usize,
+    clipped: bool,
+    z: f64,
+}
+
+#[derive(Copy, Clone)]
 struct Pt2 {
     x: f64,
     y: f64,
+}
+
+trait ZAugmented {
+    fn get_z(&self) -> f64;
 }
 
 fn get_color() -> RGBA {
@@ -247,6 +265,31 @@ fn simple_projection<T>(p: Vertex<Pt3, T>, proj: &ProjectionData) -> Vertex<Pt2,
         uv: p.uv,
     };
 }
+
+fn simple_projection_with_z(
+    p: Vertex<Pt3, RasterPoint>,
+    proj: &ProjectionData,
+) -> Vertex<Pt2, RasterPointDepth> {
+    let t = (1.0 - p.spatial * proj.plane_unit_normal)
+        / ((p.spatial - proj.origin_pt) * proj.plane_unit_normal);
+    let z = p.spatial * proj.plane_unit_normal;
+    let projected_point = proj.origin_pt * t + p.spatial * (1.0 - t);
+    let plane_x = projected_point * proj.plane_basis_x;
+    let plane_y = projected_point * proj.plane_basis_y;
+    return Vertex {
+        spatial: Pt2 {
+            x: plane_x,
+            y: plane_y,
+        },
+        uv: RasterPointDepth {
+            x: p.uv.x,
+            y: p.uv.y,
+            clipped: p.uv.clipped,
+            z,
+        },
+    };
+}
+
 fn spatial_to_pixel<T>(p: Vertex<Pt2, T>) -> Vertex<RasterPoint, T> {
     let v = ViewportData {
         x_min: -4.0,
@@ -340,6 +383,27 @@ fn slope_intercept(from: RasterPoint, to: RasterPoint) -> (f64, f64) {
     let slope = (from.x as f64 - to.x as f64) / (from.y as f64 - to.y as f64);
     let intercept = from.x as f64 - (from.y as f64 * slope);
     return (slope, intercept);
+}
+
+fn slope_intercept_perspective<T, U>(
+    from: &Vertex<U, T>,
+    to: &Vertex<U, T>,
+    steps: u32,
+) -> (f64, f64, T, T)
+where
+    T: ops::Add<T, Output = T> + ops::Mul<f64, Output = T> + ops::Sub<T, Output = T>,
+    U: ZAugmented,
+{
+    let z1_inv = from.spatial.get_z().recip();
+    let z2_inv = to.spatial.get_z().recip();
+    let steps_inv = (steps as f64).recip();
+    let z_inv_slope = (z2_inv - z1_inv) * steps_inv;
+    let z_inv_intercept = z1_inv;
+    let T1_zinv = from.uv * z1_inv;
+    let T2_zinv = to.uv * z2_inv;
+    let T_zinv_slope = (T2_zinv - T1_zinv) * steps_inv;
+    let T_zinv_intercept = T1_zinv;
+    return (z_inv_slope, z_inv_intercept, T_zinv_slope, T_zinv_intercept);
 }
 
 fn normal_form<T>(
