@@ -34,7 +34,7 @@ fn main() -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     // Create a red-green gradient
     let sys_time = SystemTime::now();
-    let tris = varvar::make_triangle_partition(-2.0, 2.0, -1.5, 2.5, 2, 2, 0.01);
+    let tris = varvar::make_triangle_partition(-2.0, 2.0, -1.5, 2.5, 10, 10, 0.2);
     let mut event_pump = sdl_context.event_pump()?;
 
     'running: loop {
@@ -72,7 +72,7 @@ fn main() -> Result<(), String> {
         let mut pixels = [0u8; 4 * W * H];
         let mut plot = |x: usize, y: usize, color: Pt3| {
             let idx = 4 * x + 4 * W * y;
-            let bytes = [0u8, color.x as u8, color.y as u8, color.z as u8];
+            let bytes = [color.x as u8, color.y as u8, color.z as u8, 0u8];
             if pixels[idx] as u32
                 + pixels[idx + 1] as u32
                 + pixels[idx + 2] as u32

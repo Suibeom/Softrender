@@ -122,18 +122,18 @@ where
 }
 
 fn slope_intercept_perspective<T>(
-    from: &RasterLocatedVertex<T>,
-    to: &RasterLocatedVertex<T>,
+    from: T,
+    to: T,
+    from_zinv: f64,
+    to_zinv: f64,
     steps: i32,
     start: i32,
 ) -> (T, T)
 where
     T: ops::Add<T, Output = T> + ops::Mul<f64, Output = T> + ops::Sub<T, Output = T> + Copy,
 {
-    let z1_inv = from.projected.z.recip();
-    let z2_inv = to.projected.z.recip();
-    let uv1_zinv = from.variable * z1_inv;
-    let uv2_zinv = to.variable * z2_inv;
+    let uv1_zinv = from * from_zinv;
+    let uv2_zinv = to * to_zinv;
     return slope_intercept(uv1_zinv, uv2_zinv, steps, start);
 }
 
@@ -179,12 +179,7 @@ where
         return;
     };
     points.sort_unstable_by(compare_raster_lex::<T>);
-    for pts in &points {
-        println!(
-            "raster_x:{}, raster_y:{}",
-            pts.raster_location.x, pts.raster_location.y
-        );
-    }
+
     let pt1: RasterLocatedVertex<T> = points[0];
 
     let (v1_x, v1_y) = (
@@ -214,14 +209,13 @@ where
         left_steps,
         pt1.raster_location.y as i32,
     );
-    println!("left_m:{}, left_b:{}", left_m, left_b);
+
     let (right_m, right_b) = slope_intercept(
         pt1.raster_location.x as f64,
         pt3.raster_location.x as f64,
         right_steps,
         pt1.raster_location.y as i32,
     );
-    println!("right_m:{}, right_b:{}", right_m, right_b);
 
     let (bottom_m, bottom_b) = slope_intercept(
         pt2.raster_location.x as f64,
@@ -229,58 +223,92 @@ where
         bottom_steps,
         pt2.raster_location.y as i32,
     );
-    println!("bottom_m:{}, bottom_b:{}", bottom_m, bottom_b);
 
-    let (left_var_m, left_var_b) =
-        slope_intercept_perspective(&pt1, &pt2, left_steps, pt1.raster_location.y as i32);
-    let (right_var_m, right_var_b) =
-        slope_intercept_perspective(&pt1, &pt3, right_steps, pt1.raster_location.y as i32);
-    let (bottom_var_m, bottom_var_b) =
-        slope_intercept_perspective(&pt2, &pt3, bottom_steps, pt2.raster_location.y as i32);
+    let (left_zinv_m, left_zinv_b) = slope_intercept(
+        (pt1.projected.z as f64).recip(),
+        (pt2.projected.z as f64).recip(),
+        left_steps,
+        pt1.raster_location.y as i32,
+    );
 
-    println!(
-        "y_start:{}, y_end:{}, y_mid:{}, left_bottom:{}",
-        y_start, y_end, y_mid, left_bottom
+    let (right_zinv_m, right_zinv_b) = slope_intercept(
+        (pt1.projected.z as f64).recip(),
+        (pt3.projected.z as f64).recip(),
+        right_steps,
+        pt1.raster_location.y as i32,
     );
-    println!(
-        "left_steps:{}, right_steps:{}, bottom_steps:{}",
-        left_steps, right_steps, bottom_steps
+
+    let (bottom_zinv_m, bottom_zinv_b) = slope_intercept(
+        (pt2.projected.z as f64).recip(),
+        (pt3.projected.z as f64).recip(),
+        bottom_steps,
+        pt2.raster_location.y as i32,
     );
+
+    let (left_var_m, left_var_b) = slope_intercept_perspective(
+        pt1.variable,
+        pt2.variable,
+        (pt1.projected.z as f64).recip(),
+        (pt2.projected.z as f64).recip(),
+        left_steps,
+        pt1.raster_location.y as i32,
+    );
+    let (right_var_m, right_var_b) = slope_intercept_perspective(
+        pt1.variable,
+        pt3.variable,
+        (pt1.projected.z as f64).recip(),
+        (pt3.projected.z as f64).recip(),
+        right_steps,
+        pt1.raster_location.y as i32,
+    );
+    let (bottom_var_m, bottom_var_b) = slope_intercept_perspective(
+        pt2.variable,
+        pt3.variable,
+        (pt2.projected.z as f64).recip(),
+        (pt3.projected.z as f64).recip(),
+        bottom_steps,
+        pt2.raster_location.y as i32,
+    );
+
     for y in y_start..y_end {
-        println!("y<y_mid: {}", y < y_mid);
-        let (x_left, x_right, var_left, var_right) = match y < y_mid {
+        let (x_left, x_right, var_left, var_right, zinv_left, zinv_right) = match y < y_mid {
             true => (
                 (left_m * (y as i64) as f64 + left_b) as usize,
                 (right_m * (y as i64) as f64 + right_b) as usize,
-                (left_var_m * (y as i64) as f64 + left_var_b),
-                (right_var_m * (y as i64) as f64 + right_var_b),
+                (left_var_m * (y as f64) + left_var_b),
+                (right_var_m * (y as f64) + right_var_b),
+                (left_zinv_m * (y as f64) + left_zinv_b),
+                (right_zinv_m * (y as f64) + right_zinv_b),
             ),
             false => match left_bottom {
                 true => (
                     (bottom_m * (y as i64) as f64 + bottom_b) as usize,
                     (right_m * (y as i64) as f64 + right_b) as usize,
-                    (bottom_var_m * (y as i64) as f64 + bottom_var_b),
-                    (right_var_m * (y as i64) as f64 + right_var_b),
+                    (bottom_var_m * (y as f64) + bottom_var_b),
+                    (right_var_m * (y as f64) + right_var_b),
+                    (bottom_zinv_m * (y as f64) + bottom_zinv_b),
+                    (right_zinv_m * (y as f64) + right_zinv_b),
                 ),
                 false => (
                     (left_m * (y as i64) as f64 + left_b) as usize,
                     (bottom_m * (y as i64) as f64 + bottom_b) as usize,
-                    (left_var_m * (y as i64) as f64 + left_var_b),
-                    (bottom_var_m * (y as i64) as f64 + bottom_var_b),
+                    (left_var_m * (y as f64) + left_var_b),
+                    (bottom_var_m * (y as f64) + bottom_var_b),
+                    (left_zinv_m * (y as f64) + left_zinv_b),
+                    (bottom_zinv_m * (y as f64) + bottom_zinv_b),
                 ),
             },
         };
-        if x_left > x_right {
-            println!("oop!");
-        }
-        println!("x_left:{}, x_right:{}, y:{}", x_left, x_right, y);
         let x_steps = x_right as i32 - x_left as i32;
         let (scanline_var_slope, scanline_var_intercept) =
             slope_intercept(var_left, var_right, x_steps, x_left as i32);
+        let (scanline_zinv_slope, scanline_zinv_intercept) =
+            slope_intercept(zinv_left, zinv_right, x_steps, x_left as i32);
         for x in x_left..x_right {
             let var = scanline_var_slope * x as f64 + scanline_var_intercept;
-            //println!("x{}, y{}", x, y);
-            plotter(x, y, var);
+            let zinv = scanline_zinv_slope * x as f64 + scanline_zinv_intercept;
+            //
+            plotter(x, y, var * zinv.recip());
         }
     }
 }
