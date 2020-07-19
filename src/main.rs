@@ -57,11 +57,7 @@ fn main() -> Result<(), String> {
                 y: 0.0,
                 z: 0.0,
             },
-            plane_unit_normal: Pt3 {
-                x: 0.0,
-                y: 0.0,
-                z: 1.0,
-            },
+            plane_unit_normal: Pt3 { x: 0.0, y, z: 1.0 },
             plane_basis_x: Pt3 { x: x, y: y, z: 0.0 },
             plane_basis_y: Pt3 {
                 x: y,
@@ -69,66 +65,16 @@ fn main() -> Result<(), String> {
                 z: 0.0,
             },
         };
+        let mut z_buff = [std::f64::NEG_INFINITY; 4 * W * H];
         let mut pixels = [0u8; 4 * W * H];
-        let mut plot = |x: usize, y: usize, color: Pt3| {
+        let mut plot = |x: usize, y: usize, z: f64, color: Pt3| {
             let idx = 4 * x + 4 * W * y;
             let bytes = [color.x as u8, color.y as u8, color.z as u8, 0u8];
-            if pixels[idx] as u32
-                + pixels[idx + 1] as u32
-                + pixels[idx + 2] as u32
-                + pixels[idx + 3] as u32
-                != 0
-            {
-                pixels[idx..idx + 4].clone_from_slice(&[0xFF, 0xFF, 0xFF, 0xFF]);
-                return;
+            if z_buff[idx] < z {
+                pixels[idx..idx + 4].clone_from_slice(&bytes);
+                z_buff[idx] = z;
             }
-            pixels[idx..idx + 4].clone_from_slice(&bytes);
         };
-
-        // let t1 = varvar::Triangle {
-        //     points: [
-        //         varvar::Vertex::<Pt3> {
-        //             spatial: Pt3 {
-        //                 x: 0.1,
-        //                 y: 0.0,
-        //                 z: 1.0,
-        //             },
-        //             variable: Pt3 {
-        //                 x: 128.0,
-        //                 y: 128.0,
-        //                 z: 128.0,
-        //             },
-        //         },
-        //         varvar::Vertex::<Pt3> {
-        //             spatial: Pt3 {
-        //                 x: 1.0,
-        //                 y: 0.1,
-        //                 z: 1.0,
-        //             },
-        //             variable: Pt3 {
-        //                 x: 128.0,
-        //                 y: 128.0,
-        //                 z: 128.0,
-        //             },
-        //         },
-        //         varvar::Vertex::<Pt3> {
-        //             spatial: Pt3 {
-        //                 x: 1.0,
-        //                 y: 1.0,
-        //                 z: 1.1,
-        //             },
-        //             variable: Pt3 {
-        //                 x: 128.0,
-        //                 y: 128.0,
-        //                 z: 128.0,
-        //             },
-        //         },
-        //     ],
-        // };
-        // varvar::draw_triangle(
-        //     varvar::prep_triangle(t1, &varvar::DEFAULT_VIEWPORT, &proj),
-        //     &mut plot,
-        // );
 
         for tri in &tris {
             varvar::draw_triangle(

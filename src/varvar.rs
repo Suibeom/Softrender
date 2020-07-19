@@ -168,7 +168,7 @@ pub fn prep_triangle<T: Copy>(
 
 pub fn draw_triangle<T, P>(t: Triangle<RasterLocatedVertex<T>>, plotter: &mut P)
 where
-    P: FnMut(usize, usize, T) -> (),
+    P: FnMut(usize, usize, f64, T) -> (),
     T: ops::Add<T, Output = T> + ops::Mul<f64, Output = T> + ops::Sub<T, Output = T> + Copy,
 {
     let mut points: [RasterLocatedVertex<T>; 3] = t.points;
@@ -307,8 +307,8 @@ where
         for x in x_left..x_right {
             let var = scanline_var_slope * x as f64 + scanline_var_intercept;
             let zinv = scanline_zinv_slope * x as f64 + scanline_zinv_intercept;
-            //
-            plotter(x, y, var * zinv.recip());
+            let z = zinv.recip();
+            plotter(x, y, z, var * z);
         }
     }
 }
@@ -334,7 +334,8 @@ pub fn make_triangle_partition(
     ];
     for i in 0..grid_height {
         for j in 0..grid_width {
-            let (down, right): (bool, bool) = (rand::random(), rand::random());
+            let (down, right, out): (bool, bool, bool) =
+                (rand::random(), rand::random(), rand::random());
             let x = match down {
                 false => (i as f64 * float_pitch_x) + x_min,
                 true => (i as f64 * float_pitch_x) + x_min + jitter,
@@ -343,7 +344,11 @@ pub fn make_triangle_partition(
                 false => (j as f64 * float_pitch_y) + y_min,
                 true => (j as f64 * float_pitch_y) + y_min + jitter,
             };
-            points[i + grid_height * j] = Pt3 { x, y, z: 1.0 };
+            let z = match out {
+                false => 1.0,
+                true => 1.0 + jitter,
+            };
+            points[i + grid_height * j] = Pt3 { x, y, z };
         }
     }
     let mut triangles: Vec<Triangle<Vertex<Pt3>>> = Vec::new();
