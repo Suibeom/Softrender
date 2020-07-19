@@ -35,8 +35,7 @@ fn main() -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     // Create a red-green gradient
     let sys_time = SystemTime::now();
-    let tris = flat::make_triangle_partition(-2.0, 2.0, -1.5, 2.5, 400, 400, 0.01);
-
+    let tris = varvar::make_triangle_partition(-2.0, 2.0, -1.5, 2.5, 2,2, 0.01);
     let mut event_pump = sdl_context.event_pump()?;
 
     'running: loop {
@@ -52,7 +51,7 @@ fn main() -> Result<(), String> {
         }
         // The rest of the game loop goes here...
         let elapsed = sys_time.elapsed().unwrap().as_secs_f64();
-        let (x, y) = elapsed.sin_cos();
+        let (x, y) =elapsed.sin_cos();
         let proj = ProjectionData {
             origin_pt: common::Pt3 {
                 x: 0.0,
@@ -66,15 +65,15 @@ fn main() -> Result<(), String> {
             },
             plane_basis_x: Pt3 { x: x, y: y, z: 0.0 },
             plane_basis_y: Pt3 {
-                x: -y,
-                y: x,
+                x: y,
+                y: -x,
                 z: 0.0,
             },
         };
         let mut pixels = [0u8; 4 * W * H];
-        let mut plot = |x: usize, y: usize, color: flat::RGBA| {
+        let mut plot = |x: usize, y: usize, color: Pt3| {
             let idx = 4 * x + 4 * W * y;
-            let bytes = color.c.to_ne_bytes();
+            let bytes = [0u8, color.x as u8, color.y as u8, color.z as u8];
             if pixels[idx] as u32
                 + pixels[idx + 1] as u32
                 + pixels[idx + 2] as u32
@@ -86,9 +85,57 @@ fn main() -> Result<(), String> {
             }
             pixels[idx..idx + 4].clone_from_slice(&bytes);
         };
-        let simple_proj = |t| flat::simple_projection(t, &proj);
+
+        // let t1 = varvar::Triangle {
+        //     points: [
+        //         varvar::Vertex::<Pt3> {
+        //             spatial: Pt3 {
+        //                 x: 0.1,
+        //                 y: 0.0,
+        //                 z: 1.0,
+        //             },
+        //             variable: Pt3 {
+        //                 x: 128.0,
+        //                 y: 128.0,
+        //                 z: 128.0,
+        //             },
+        //         },
+        //         varvar::Vertex::<Pt3> {
+        //             spatial: Pt3 {
+        //                 x: 1.0,
+        //                 y: 0.1,
+        //                 z: 1.0,
+        //             },
+        //             variable: Pt3 {
+        //                 x: 128.0,
+        //                 y: 128.0,
+        //                 z: 128.0,
+        //             },
+        //         },
+        //         varvar::Vertex::<Pt3> {
+        //             spatial: Pt3 {
+        //                 x: 1.0,
+        //                 y: 1.0,
+        //                 z: 1.1,
+        //             },
+        //             variable: Pt3 {
+        //                 x: 128.0,
+        //                 y: 128.0,
+        //                 z: 128.0,
+        //             },
+        //         },
+        //     ],
+        // };
+        // varvar::draw_triangle(
+        //     varvar::prep_triangle(t1, &varvar::DEFAULT_VIEWPORT, &proj),
+        //     &mut plot,
+        // );
+
         for tri in &tris {
-            flat::draw_triangle(flat::prep_triangle(*tri, &simple_proj), &mut plot);
+            varvar::draw_triangle(
+                varvar::prep_triangle(*tri, &varvar::DEFAULT_VIEWPORT, &proj),
+                &mut plot,
+            );
         }
 
         texture
