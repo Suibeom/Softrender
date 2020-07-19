@@ -7,7 +7,6 @@ use sdl2::pixels::PixelFormatEnum;
 use std::time::SystemTime;
 
 mod common;
-mod flat;
 mod varvar;
 
 use crate::common::*;
