@@ -35,7 +35,7 @@ fn main() -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     // Create a red-green gradient
     let sys_time = SystemTime::now();
-    let tris = varvar::make_triangle_partition(-2.0, 2.0, -1.5, 2.5, 2,2, 0.01);
+    let tris = varvar::make_triangle_partition(-2.0, 2.0, -1.5, 2.5, 2, 2, 0.01);
     let mut event_pump = sdl_context.event_pump()?;
 
     'running: loop {
@@ -51,7 +51,7 @@ fn main() -> Result<(), String> {
         }
         // The rest of the game loop goes here...
         let elapsed = sys_time.elapsed().unwrap().as_secs_f64();
-        let (x, y) =elapsed.sin_cos();
+        let (x, y) = elapsed.sin_cos();
         let proj = ProjectionData {
             origin_pt: common::Pt3 {
                 x: 0.0,

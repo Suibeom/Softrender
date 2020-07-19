@@ -32,9 +32,7 @@ where
     variable: V,
 }
 #[derive(Copy, Clone)]
-pub struct RasterLocatedVertex<V>
-
-{
+pub struct RasterLocatedVertex<V> {
     spatial: Pt3,
     projected: Pt3,
     variable: V,
@@ -113,21 +111,21 @@ pub fn raster_locate_vertex<T: Copy>(
     };
 }
 
-
 fn slope_intercept<T>(from: T, to: T, steps: i32, start: i32) -> (T, T)
 where
     T: ops::Add<T, Output = T> + ops::Mul<f64, Output = T> + ops::Sub<T, Output = T> + Copy,
 {
     let steps_inv = (steps as f64).recip();
     let slope: T = (to - from) * steps_inv;
-    let intercept = from - (slope*start as f64);
+    let intercept = from - (slope * start as f64);
     return (slope, intercept);
 }
 
 fn slope_intercept_perspective<T>(
     from: &RasterLocatedVertex<T>,
     to: &RasterLocatedVertex<T>,
-    steps: i32, start: i32
+    steps: i32,
+    start: i32,
 ) -> (T, T)
 where
     T: ops::Add<T, Output = T> + ops::Mul<f64, Output = T> + ops::Sub<T, Output = T> + Copy,
@@ -205,33 +203,40 @@ where
     let y_start = pt1.raster_location.y;
     let y_end = std::cmp::max(pt2.raster_location.y, pt3.raster_location.y);
     let y_mid = std::cmp::min(pt2.raster_location.y, pt3.raster_location.y);
-    let y_3 = pt3.raster_location.y;
     let left_bottom = pt2.raster_location.y <= pt3.raster_location.y;
-    let left_steps = (pt2.raster_location.y as i32 - pt1.raster_location.y as i32);
-    let right_steps = (pt3.raster_location.y as i32 - pt1.raster_location.y as i32);
-     let bottom_steps = (pt3.raster_location.y as i32 - pt2.raster_location.y as i32);
+    let left_steps = pt2.raster_location.y as i32 - pt1.raster_location.y as i32;
+    let right_steps = pt3.raster_location.y as i32 - pt1.raster_location.y as i32;
+    let bottom_steps = pt3.raster_location.y as i32 - pt2.raster_location.y as i32;
 
     let (left_m, left_b) = slope_intercept(
-
-pt1.raster_location.x as f64, pt2.raster_location.x as f64, left_steps, pt1.raster_location.y as i32   );
+        pt1.raster_location.x as f64,
+        pt2.raster_location.x as f64,
+        left_steps,
+        pt1.raster_location.y as i32,
+    );
     println!("left_m:{}, left_b:{}", left_m, left_b);
     let (right_m, right_b) = slope_intercept(
         pt1.raster_location.x as f64,
         pt3.raster_location.x as f64,
-        right_steps, pt1.raster_location.y as i32
+        right_steps,
+        pt1.raster_location.y as i32,
     );
     println!("right_m:{}, right_b:{}", right_m, right_b);
 
     let (bottom_m, bottom_b) = slope_intercept(
         pt2.raster_location.x as f64,
         pt3.raster_location.x as f64,
-        bottom_steps, pt2.raster_location.y as i32
+        bottom_steps,
+        pt2.raster_location.y as i32,
     );
     println!("bottom_m:{}, bottom_b:{}", bottom_m, bottom_b);
 
-    let (left_var_m, left_var_b) = slope_intercept_perspective(&pt1, &pt2, left_steps, pt1.raster_location.y as i32);
-    let (right_var_m, right_var_b) = slope_intercept_perspective(&pt1, &pt3, right_steps, pt1.raster_location.y as i32);
-    let (bottom_var_m, bottom_var_b) = slope_intercept_perspective(&pt2, &pt3, bottom_steps, pt2.raster_location.y as i32);
+    let (left_var_m, left_var_b) =
+        slope_intercept_perspective(&pt1, &pt2, left_steps, pt1.raster_location.y as i32);
+    let (right_var_m, right_var_b) =
+        slope_intercept_perspective(&pt1, &pt3, right_steps, pt1.raster_location.y as i32);
+    let (bottom_var_m, bottom_var_b) =
+        slope_intercept_perspective(&pt2, &pt3, bottom_steps, pt2.raster_location.y as i32);
 
     println!(
         "y_start:{}, y_end:{}, y_mid:{}, left_bottom:{}",
@@ -245,31 +250,31 @@ pt1.raster_location.x as f64, pt2.raster_location.x as f64, left_steps, pt1.rast
         println!("y<y_mid: {}", y < y_mid);
         let (x_left, x_right, var_left, var_right) = match y < y_mid {
             true => (
-                (left_m * (y as i64 ) as f64 + left_b) as usize,
-                (right_m * (y as i64 ) as f64 + right_b) as usize,
-                (left_var_m * (y as i64 ) as f64 + left_var_b),
-                (right_var_m * (y as i64 ) as f64 + right_var_b),
+                (left_m * (y as i64) as f64 + left_b) as usize,
+                (right_m * (y as i64) as f64 + right_b) as usize,
+                (left_var_m * (y as i64) as f64 + left_var_b),
+                (right_var_m * (y as i64) as f64 + right_var_b),
             ),
             false => match left_bottom {
                 true => (
-                    (bottom_m * (y as i64 ) as f64 + bottom_b) as usize,
-                    (right_m * (y as i64 ) as f64 + right_b) as usize,
-                    (bottom_var_m * (y as i64 ) as f64 + bottom_var_b),
-                    (right_var_m * (y as i64 ) as f64 + right_var_b),
+                    (bottom_m * (y as i64) as f64 + bottom_b) as usize,
+                    (right_m * (y as i64) as f64 + right_b) as usize,
+                    (bottom_var_m * (y as i64) as f64 + bottom_var_b),
+                    (right_var_m * (y as i64) as f64 + right_var_b),
                 ),
                 false => (
-                    (left_m * (y as i64 ) as f64 + left_b) as usize,
-                    (bottom_m * (y as i64 ) as f64 + bottom_b) as usize,
-                    (left_var_m * (y as i64 ) as f64 + left_var_b),
-                    (bottom_var_m * (y as i64 ) as f64 + bottom_var_b),
+                    (left_m * (y as i64) as f64 + left_b) as usize,
+                    (bottom_m * (y as i64) as f64 + bottom_b) as usize,
+                    (left_var_m * (y as i64) as f64 + left_var_b),
+                    (bottom_var_m * (y as i64) as f64 + bottom_var_b),
                 ),
             },
         };
-        if (x_left > x_right){
+        if x_left > x_right {
             println!("oop!");
         }
         println!("x_left:{}, x_right:{}, y:{}", x_left, x_right, y);
-        let x_steps = (x_right as i32 - x_left as i32);
+        let x_steps = x_right as i32 - x_left as i32;
         let (scanline_var_slope, scanline_var_intercept) =
             slope_intercept(var_left, var_right, x_steps, x_left as i32);
         for x in x_left..x_right {
@@ -399,13 +404,13 @@ pub fn make_triangle_partition(
 }
 
 #[cfg(test)]
-mod tests{
+mod tests {
     #[test]
     fn slopes_work() {
-        let (m, b) = crate::varvar::slope_intercept(0.0, 10.0, 10);
+        let (m, b) = crate::varvar::slope_intercept(0.0, 10.0, 10, 0);
         assert_eq!(m, 1.0);
         assert_eq!(b, 0.0);
-        let (m, b) = crate::varvar::slope_intercept(10.0, 0.0, 10);
+        let (m, b) = crate::varvar::slope_intercept(10.0, 0.0, 10, 0);
         assert_eq!(m, -1.0);
         assert_eq!(b, 10.0);
     }
