@@ -34,7 +34,7 @@ fn main() -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     // Create a red-green gradient
     let sys_time = SystemTime::now();
-    let tris = varvar::make_triangle_partition(-2.0, 2.0, -1.5, 2.5, 10, 10, 0.2);
+    let tris = varvar::make_triangle_partition(-2.5, 2.5, -2.5, 2.5, 15, 15, 0.2);
     let mut event_pump = sdl_context.event_pump()?;
 
     'running: loop {
@@ -57,7 +57,11 @@ fn main() -> Result<(), String> {
                 y: 0.0,
                 z: 0.0,
             },
-            plane_unit_normal: Pt3 { x: 0.0, y, z: 1.0 },
+            plane_unit_normal: Pt3 {
+                x: 0.0,
+                y: 0.0,
+                z: 1.0,
+            },
             plane_basis_x: Pt3 { x: x, y: y, z: 0.0 },
             plane_basis_y: Pt3 {
                 x: y,
