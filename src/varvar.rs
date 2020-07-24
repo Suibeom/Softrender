@@ -365,15 +365,15 @@ pub fn make_triangle_partition(
                         points: [
                             Vertex {
                                 spatial: points[i + grid_height * j],
-                                variable: get_color(),
+                                variable: points[i + grid_height * j], // get_color(),
                             },
                             Vertex {
                                 spatial: points[i + 1 + grid_height * j],
-                                variable: get_color(),
+                                variable: points[i + 1 + grid_height * j], //get_color(),
                             },
                             Vertex {
                                 spatial: points[i + 1 + grid_height * (j + 1)],
-                                variable: get_color(),
+                                variable: points[i + 1 + grid_height * (j + 1)], //get_color(),
                             },
                         ],
                     });
@@ -381,15 +381,15 @@ pub fn make_triangle_partition(
                         points: [
                             Vertex {
                                 spatial: points[i + grid_height * j],
-                                variable: get_color(),
+                                variable: points[i + grid_height * j], //get_color(),
                             },
                             Vertex {
                                 spatial: points[i + grid_height * (j + 1)],
-                                variable: get_color(),
+                                variable: points[i + grid_height * (j + 1)], // get_color(),
                             },
                             Vertex {
                                 spatial: points[i + 1 + grid_height * (j + 1)],
-                                variable: get_color(),
+                                variable: points[i + 1 + grid_height * (j + 1)], //get_color(),
                             },
                         ],
                     });
@@ -400,15 +400,15 @@ pub fn make_triangle_partition(
                         points: [
                             Vertex {
                                 spatial: points[i + grid_height * j],
-                                variable: get_color(),
+                                variable: points[i + grid_height * j], //get_color(),
                             },
                             Vertex {
                                 spatial: points[i + 1 + grid_height * j],
-                                variable: get_color(),
+                                variable: points[i + 1 + grid_height * j], //get_color(),
                             },
                             Vertex {
                                 spatial: points[i + grid_height * (j + 1)],
-                                variable: get_color(),
+                                variable: points[i + grid_height * (j + 1)], //get_color(),
                             },
                         ],
                     });
@@ -416,15 +416,15 @@ pub fn make_triangle_partition(
                         points: [
                             Vertex {
                                 spatial: points[i + 1 + grid_height * j],
-                                variable: get_color(),
+                                variable: points[i + 1 + grid_height * j], //get_color(),
                             },
                             Vertex {
                                 spatial: points[i + grid_height * (j + 1)],
-                                variable: get_color(),
+                                variable: points[i + grid_height * (j + 1)], //get_color(),
                             },
                             Vertex {
                                 spatial: points[i + 1 + grid_height * (j + 1)],
-                                variable: get_color(),
+                                variable: points[i + 1 + grid_height * (j + 1)], //get_color(),
                             },
                         ],
                     });
