@@ -66,7 +66,7 @@ fn main() -> Result<(), String> {
     let sys_time = SystemTime::now();
     let tris = varvar::make_triangle_partition(-2.5, 2.5, -2.5, 2.5, 100, 100, 0.1);
     let mut event_pump = sdl_context.event_pump()?;
-    let tex = gen_texture_1();
+    let tex: [u8; TxH * TxW * 4] = gen_texture_1();
     let uv_to_xy = |x: f64, y: f64| {
         let (x_min, x_max) = (-2.6, 2.6);
         let (y_min, y_max) = (-2.6, 2.6);
@@ -77,6 +77,10 @@ fn main() -> Result<(), String> {
         );
     };
     let mut frames = 0;
+    static mut z_buff: [f64; 4 * W * H] = [std::f64::NEG_INFINITY; 4 * W * H];
+    const blank_z: [f64; 4 * W * H] = [std::f64::NEG_INFINITY; 4 * W * H];
+    static mut pixels: [u8; 4 * W * H] = [0u8; 4 * W * H];
+    const blank_pix: [u8; 4 * W * H] = [0u8; 4 * W * H];
     'running: loop {
         for event in event_pump.poll_iter() {
             match event {
@@ -109,16 +113,20 @@ fn main() -> Result<(), String> {
                 z: 0.0,
             },
         };
-        let mut z_buff = [std::f64::NEG_INFINITY; 4 * W * H];
-        let mut pixels = [0u8; 4 * W * H];
+        unsafe {
+            pixels = blank_pix;
+            z_buff = blank_z;
+        }
         let mut plot = |x: usize, y: usize, z: f64, uv: Pt3| {
             let idx = 4 * x + 4 * W * y;
             let (tex_x, tex_y) = uv_to_xy(uv.x, uv.y);
             let tex_idx = 4 * tex_x + 4 * TxW * tex_y;
             let bytes = &tex[tex_idx..(tex_idx + 4)];
-            if z_buff[idx] < z {
-                pixels[idx..idx + 4].clone_from_slice(bytes);
-                z_buff[idx] = z;
+            unsafe {
+                if z_buff[idx] < z {
+                    pixels[idx..idx + 4].clone_from_slice(bytes);
+                    z_buff[idx] = z;
+                }
             }
         };
         for tri in &tris {
@@ -127,11 +135,11 @@ fn main() -> Result<(), String> {
                 &mut plot,
             );
         }
-
-        texture
-            .update(None, &pixels, 4 * W)
-            .map_err(|e| e.to_string())?;
-
+        unsafe {
+            texture
+                .update(None, &pixels, 4 * W)
+                .map_err(|e| e.to_string())?;
+        }
         canvas.clear();
         canvas.copy(&texture, None, None)?;
         canvas.present();
