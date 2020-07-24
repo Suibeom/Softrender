@@ -76,7 +76,7 @@ fn main() -> Result<(), String> {
             (((y - y_min) / (y_max - y_min)) * TxH as f64) as usize,
         );
     };
-
+    let mut frames = 0;
     'running: loop {
         for event in event_pump.poll_iter() {
             match event {
@@ -135,8 +135,8 @@ fn main() -> Result<(), String> {
         canvas.clear();
         canvas.copy(&texture, None, None)?;
         canvas.present();
-        let elapsed_2 = (sys_time.elapsed().unwrap().as_secs_f64() - elapsed).recip();
-        println!("fps approx: {}", elapsed_2);
+        frames = frames + 1;
+        println!("Approximate fps: {}", frames as f64 / elapsed);
     }
 
     Ok(())
